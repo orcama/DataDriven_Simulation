@@ -1,74 +1,82 @@
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from queue import Queue
-from pymongo import MongoClient
+from datetime import datetime
 
-def get_data_from_db():
-    # Koneksi ke MongoDB
-    client = MongoClient("mongodb+srv://anharinizam:UPvln2zIzmH0m1Pq@database1.nom1v.mongodb.net/?retryWrites=true&w=majority&appName=Database1")
-    db = client["Online_retail"]  # Ganti dengan nama database yang diinginkan
-    collection = db["mycollection"]  # Ganti dengan nama koleksi yang diinginkan
-    
-    # Mengambil data dari database
-    data = list(collection.find({}, {"_id": 0}))  # Menghilangkan field _id
-    return data
+# Load dataset
+file_path = "/Users/afif/Documents/Semester6/Pemodelan dan Simulasi Data/Tugas3/Training_dataset.csv"
+df = pd.read_csv(file_path)
 
-def queue_simulation(num_requests=100, service_rate=2, arrival_rate=1):
-    queue = Queue()
-    wait_times = []
-    time = 0
-    
-    for _ in range(num_requests):
-        time += np.random.exponential(1 / arrival_rate)
-        queue.put(time)
-        
-        if not queue.empty():
-            start_service = queue.get()
-            service_time = np.random.exponential(1 / service_rate)
-            wait_times.append(service_time)
-    
-    return wait_times
+# Explore dataset
+print("Informasi dataset:")
+print(df.info())
 
-def performance_analysis(wait_times):
-    mean_wait = np.mean(wait_times)
-    median_wait = np.median(wait_times)
-    print(f"Rata-rata waktu tunggu: {mean_wait:.2f} detik")
-    print(f"Median waktu tunggu: {median_wait:.2f} detik")
+print("\nStatistik deskriptif:")
+print(df.describe(include='all'))
+
+print("\nJumlah nilai null per kolom:")
+print(df.isnull().sum())
+
+print("\nLima baris pertama dataset:")
+print(df.head())
+
+# Convert time-related columns to datetime format
+time_columns = ['Arrival_Time', 'Start_Time', 'Finish_Time']
+for col in time_columns:
+    df[col] = pd.to_datetime(df[col], errors='coerce')
+
+# Convert Wait_Time to timedelta
+df['Wait_Time'] = pd.to_timedelta(df['Wait_Time'], errors='coerce')
+
+# Step 2: Implement Queueing Simulation
+class QueueSimulation:
+    def __init__(self, df):
+        self.df = df
+        self.df['Service_Time'] = (self.df['Finish_Time'] - self.df['Start_Time']).dt.total_seconds()
     
-    plt.figure(figsize=(10, 5))
-    sns.histplot(wait_times, bins=20, kde=True)
-    plt.xlabel("Waktu Tunggu")
-    plt.ylabel("Frekuensi")
-    plt.title("Distribusi Waktu Tunggu")
+    def simulate_queue(self):
+        avg_wait_time = self.df['Wait_Time'].dt.total_seconds().mean()
+        avg_service_time = self.df['Service_Time'].mean()
+        avg_queue_length = self.df['Queue_Length'].mean()
+        return avg_wait_time, avg_service_time, avg_queue_length
+
+# Step 3: Performance Analysis & Visualization
+def plot_performance(df):
+    plt.figure(figsize=(12, 6))
+    sns.histplot(df['Wait_Time'].dt.total_seconds(), bins=30, kde=True)
+    plt.xlabel('Wait Time (seconds)')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Customer Wait Times')
     plt.show()
 
-def optimize_parameters():
-    best_service_rate = None
-    best_mean_wait = float("inf")
-    
-    for service_rate in np.arange(1, 5, 0.5):
-        wait_times = queue_simulation(service_rate=service_rate)
-        mean_wait = np.mean(wait_times)
-        if mean_wait < best_mean_wait:
-            best_mean_wait = mean_wait
-            best_service_rate = service_rate
-    
-    print(f"Optimasi: Laju pelayanan terbaik: {best_service_rate} dengan waktu tunggu rata-rata {best_mean_wait:.2f} detik")
+# Step 4: Modify Parameters and Optimize
+def modify_parameters(df, new_service_time_factor=1.2):
+    df['Optimized_Service_Time'] = df['Service_Time'] / new_service_time_factor
+    return df
 
-def plot_additional_insights(wait_times):
-    plt.figure(figsize=(10, 5))
-    plt.plot(wait_times, marker='o', linestyle='-')
-    plt.xlabel("Index Request")
-    plt.ylabel("Waktu Tunggu")
-    plt.title("Perubahan Waktu Tunggu Per Request")
+# Step 5: Plot Additional Insights
+def plot_additional_insights(df):
+    plt.figure(figsize=(12, 6))
+    avg_wait_time_per_day = df.groupby('Day')['Wait_Time'].mean().dt.total_seconds()
+    avg_wait_time_per_day.plot(kind='bar', color='skyblue', edgecolor='black')
+    
+    plt.xlabel('Day of the Week')
+    plt.ylabel('Average Wait Time (seconds)')
+    plt.title('Average Wait Time per Day')
+    plt.xticks(rotation=45)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
     plt.show()
 
-if __name__ == "__main__":
-    data = get_data_from_db()
-    print(f"Data yang diambil dari database: {len(data)} records")
-    
-    wait_times = queue_simulation()
-    performance_analysis(wait_times)
-    optimize_parameters()
-    plot_additional_insights(wait_times)
+# Execute Simulation
+queue_sim = QueueSimulation(df)
+avg_wait_time, avg_service_time, avg_queue_length = queue_sim.simulate_queue()
+print(f'Average Wait Time: {avg_wait_time:.2f} seconds')
+print(f'Average Service Time: {avg_service_time:.2f} seconds')
+print(f'Average Queue Length: {avg_queue_length:.2f}')
+
+# Visualizations
+plot_performance(df)
+df = modify_parameters(df)
+plot_additional_insights(df)
