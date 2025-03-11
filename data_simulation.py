@@ -42,17 +42,18 @@ class QueueSimulation:
         return avg_wait_time, avg_service_time, avg_queue_length
 
 # Step 3: Performance Analysis & Visualization
-def plot_performance(df):
+def plot_performance(df, title="Distribution of Customer Wait Times"):
     plt.figure(figsize=(12, 6))
     sns.histplot(df['Wait_Time'].dt.total_seconds(), bins=30, kde=True)
     plt.xlabel('Wait Time (seconds)')
     plt.ylabel('Frequency')
-    plt.title('Distribution of Customer Wait Times')
+    plt.title(title)
     plt.show()
 
 # Step 4: Modify Parameters and Optimize
 def modify_parameters(df, new_service_time_factor=1.2):
     df['Optimized_Service_Time'] = df['Service_Time'] / new_service_time_factor
+    df['Optimized_Wait_Time'] = df['Wait_Time'].dt.total_seconds() / new_service_time_factor
     return df
 
 # Step 5: Plot Additional Insights
@@ -72,11 +73,27 @@ def plot_additional_insights(df):
 # Execute Simulation
 queue_sim = QueueSimulation(df)
 avg_wait_time, avg_service_time, avg_queue_length = queue_sim.simulate_queue()
-print(f'Average Wait Time: {avg_wait_time:.2f} seconds')
+print(f'Average Wait Time Before Optimization: {avg_wait_time:.2f} seconds')
 print(f'Average Service Time: {avg_service_time:.2f} seconds')
 print(f'Average Queue Length: {avg_queue_length:.2f}')
 
 # Visualizations
-plot_performance(df)
+plot_performance(df, title="Distribution of Customer Wait Times Before Optimization")
 df = modify_parameters(df)
+
+# Calculate new average wait time
+df['Optimized_Wait_Time'] = df['Optimized_Wait_Time'].apply(lambda x: max(x, 0))
+new_avg_wait_time = df['Optimized_Wait_Time'].mean()
+print(f'Average Wait Time After Optimization: {new_avg_wait_time:.2f} seconds')
+
+# Plot comparison
+plt.figure(figsize=(8, 5))
+plt.bar(['Before Optimization', 'After Optimization'], [avg_wait_time, new_avg_wait_time], color=['red', 'green'])
+plt.xlabel('Condition')
+plt.ylabel('Average Wait Time (seconds)')
+plt.title('Comparison of Wait Time Before and After Optimization')
+plt.show()
+
+# Additional insights
+plot_performance(df, title="Distribution of Customer Wait Times After Optimization")
 plot_additional_insights(df)
